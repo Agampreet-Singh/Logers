@@ -524,7 +524,7 @@ Output:
 ```text
 User logging may run the following commands on logers:
 
-(root) NOPASSWD: /usr/local/bin/status_check.sh
+(ALL) NOPASSWD: /usr/local/bin/status_check.sh
 ```
 
 ![sudo -l](screenshots/22_sudo_l.png)
